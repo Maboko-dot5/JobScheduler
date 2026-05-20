@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Scheduler.Application.Dtos;
+using Scheduler.Application.Interfaces.Services;
 using Scheduler.Application.Orchestration;
 using Scheduler.Application.Validation;
 using Scheduler.Domain.ValueObjects;
@@ -18,16 +19,19 @@ namespace Scheduler.Api.Controllers;
 public class JobsController : ControllerBase
 {
     private readonly IJobOrchestrator _jobOrchestrator;
+    private readonly IReportStore _reportStore;
     private readonly JobRequestValidator _jobRequestValidator;
     private readonly ILogger<JobsController> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="JobsController"/> class.</summary>
     public JobsController(
         IJobOrchestrator jobOrchestrator,
+        IReportStore reportStore,
         JobRequestValidator jobRequestValidator,
         ILogger<JobsController> logger)
     {
         _jobOrchestrator = jobOrchestrator;
+        _reportStore = reportStore;
         _jobRequestValidator = jobRequestValidator;
         _logger = logger;
     }
@@ -88,6 +92,32 @@ public class JobsController : ControllerBase
         var items = await _jobOrchestrator.ListAsync(cancellationToken);
         var statusItems = items.Select(item => new JobStatusResponseDto(item.JobId, item.Status)).ToList();
         return Ok(statusItems);
+    }
+
+    /// <summary>Downloads the generated report for a job.</summary>
+    [HttpGet("{id}/report/download")]
+    public async Task<ActionResult> DownloadReportAsync(string id, CancellationToken cancellationToken)
+    {
+        if (!System.Guid.TryParse(id, out var parsedId))
+        {
+            return BadRequest();
+        }
+
+        var report = await _reportStore.GetAsync(new JobId(parsedId), cancellationToken);
+        if (report is null)
+        {
+            _logger.LogInformation("Report download requested before a report was available. JobId={JobId}", parsedId);
+            return NotFound();
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(report.ContentType)
+            ? "application/octet-stream"
+            : report.ContentType;
+        var fileName = string.IsNullOrWhiteSpace(report.FileName)
+            ? "report.pdf"
+            : report.FileName;
+
+        return File(report.Content, contentType, fileName);
     }
 
     /// <summary>Cancels a job by identifier.</summary>

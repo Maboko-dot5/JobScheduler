@@ -34,6 +34,8 @@ public static class DependencyInjection
         services.AddSingleton<IAnomalyFilterService, FakeAnomalyFilterService>();
         services.AddSingleton<IPhysicalFilterService, FakePhysicalFilterService>();
         services.AddSingleton<IReportGenerator, FakeReportGenerator>();
+        services.AddSingleton<IReportStore, InMemoryReportStore>();
+        services.AddSingleton<IEmailOutbox, InMemoryEmailOutbox>();
         services.AddSingleton<IEmailService, ConsoleEmailService>();
         services.AddSingleton<IFilteringRuleProvider, StaticFilteringRuleProvider>();
 
@@ -47,6 +49,7 @@ public static class DependencyInjection
         services.AddSingleton<JobRequestValidator>();
 
         services.AddHostedService<BackgroundJobWorker>();
+        services.AddHostedService<EmailOutboxWorker>();
 
         return services;
     }

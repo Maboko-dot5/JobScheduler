@@ -108,12 +108,12 @@ public static class Program
                     Console.WriteLine($"Errors: {status.Result.Errors.Count}");
                     if (!string.IsNullOrWhiteSpace(status.Result.PayloadJson))
                     {
-                        Console.WriteLine("Payload:");
+                        Console.WriteLine("JobResult:");
                         Console.WriteLine(status.Result.PayloadJson);
                     }
                     else
                     {
-                        Console.WriteLine("Payload: <empty>");
+                        Console.WriteLine("JobResult: <empty>");
                     }
                 }
 

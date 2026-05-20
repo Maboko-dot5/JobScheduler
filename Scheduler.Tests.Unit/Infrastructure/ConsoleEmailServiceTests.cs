@@ -1,6 +1,8 @@
 // PHASE E: Scheduler.Tests.Unit/Infrastructure/ConsoleEmailServiceTests.cs
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Moq;
 using Scheduler.Application.Dtos;
 using Scheduler.Infrastructure.Services;
 using Xunit;
@@ -14,7 +16,8 @@ public class ConsoleEmailServiceTests
     [Fact]
     public async Task SendAsync_Completes()
     {
-        var service = new ConsoleEmailService();
+        var logger = new Mock<ILogger<ConsoleEmailService>>();
+        var service = new ConsoleEmailService(logger.Object);
         var request = new EmailDeliveryDto("user@example.com", "subject", "body");
 
         await service.SendAsync(request, CancellationToken.None);

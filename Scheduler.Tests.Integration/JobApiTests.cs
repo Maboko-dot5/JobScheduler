@@ -110,6 +110,49 @@ public class JobApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(status!.Status == JobStatus.Completed || status.Status == JobStatus.Failed);
     }
 
+    /// <summary>Ensures a generated PDF report can be downloaded.</summary>
+    [Fact]
+    public async Task DownloadReport_ReturnsGeneratedReport()
+    {
+        var client = _factory.CreateClient();
+        var request = new JobSubmissionRequestDto("report-job", TaskType.PdfReport, "tester")
+        {
+            JobId = Guid.NewGuid(),
+            PlantId = "plant-001",
+            RequestedTimeRange = new TimeRangeDto(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow)
+        };
+        request.Variables.Add("temperature");
+        request.Tasks.Add(new JobTaskDto(TaskType.PdfReport));
+
+        var payload = JsonSerializer.Serialize(request);
+        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        var response = await client.PostAsync("/api/jobs", content);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var downloadUrl = $"/api/jobs/{request.JobId}/report/download";
+        HttpResponseMessage? downloadResponse = null;
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            downloadResponse = await client.GetAsync(downloadUrl);
+            if (downloadResponse.StatusCode == HttpStatusCode.OK)
+            {
+                break;
+            }
+
+            downloadResponse.Dispose();
+            await Task.Delay(200);
+        }
+
+        Assert.NotNull(downloadResponse);
+        Assert.Equal(HttpStatusCode.OK, downloadResponse!.StatusCode);
+        Assert.Equal("application/pdf", downloadResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("report.pdf", downloadResponse.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+
+        var bytes = await downloadResponse.Content.ReadAsByteArrayAsync();
+        Assert.NotEmpty(bytes);
+    }
+
     /// <summary>Ensures the health endpoint is available.</summary>
     [Fact]
     public async Task GetHealth_ReturnsSuccess()

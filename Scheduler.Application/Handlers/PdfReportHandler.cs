@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Scheduler.Application.Dtos;
 using Scheduler.Application.Interfaces.Handlers;
 using Scheduler.Application.Interfaces.Services;
+using Scheduler.Domain.ValueObjects;
 
 namespace Scheduler.Application.Handlers;
 
@@ -13,14 +14,20 @@ namespace Scheduler.Application.Handlers;
 public class PdfReportHandler : ITaskHandler
 {
     private readonly IReportGenerator _reportGenerator;
-    private readonly IEmailService _emailService;
+    private readonly IReportStore _reportStore;
+    private readonly IEmailOutbox _emailOutbox;
     private readonly ILogger<PdfReportHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="PdfReportHandler"/> class.</summary>
-    public PdfReportHandler(IReportGenerator reportGenerator, IEmailService emailService, ILogger<PdfReportHandler> logger)
+    public PdfReportHandler(
+        IReportGenerator reportGenerator,
+        IReportStore reportStore,
+        IEmailOutbox emailOutbox,
+        ILogger<PdfReportHandler> logger)
     {
         _reportGenerator = reportGenerator;
-        _emailService = emailService;
+        _reportStore = reportStore;
+        _emailOutbox = emailOutbox;
         _logger = logger;
     }
 
@@ -35,8 +42,11 @@ public class PdfReportHandler : ITaskHandler
         };
 
         var report = await _reportGenerator.GenerateAsync(request, cancellationToken);
+        await _reportStore.SaveAsync(new JobId(context.JobId), report, cancellationToken);
+        _logger.LogInformation("Report generated and saved for job {JobId}.", context.JobId);
+
         var recipient = "ops@mintek.com";
-        await _emailService.SendAsync(new EmailDeliveryDto
+        await _emailOutbox.EnqueueAsync(new EmailDeliveryDto
         {
             To = recipient,
             Subject = "Scheduled Report",
@@ -46,8 +56,8 @@ public class PdfReportHandler : ITaskHandler
 
         return new TaskExecutionResultDto(true)
         {
-            Summary = $"Report generated: {report.FileName}, Email sent to {recipient}.",
-            OutputLocation = report.FileName
+            Summary = $"Report generated: {report.FileName}, Email queued to {recipient}.",
+            OutputLocation = $"/api/jobs/{context.JobId}/report/download"
         };
     }
 }

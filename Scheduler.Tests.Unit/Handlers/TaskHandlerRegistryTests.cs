@@ -31,7 +31,11 @@ public class TaskHandlerRegistryTests
             new Mock<IStatisticsService>().Object,
             new Mock<ITimeSeriesRepository>().Object,
             new Mock<ILogger<StatisticsHandler>>().Object);
-        var pdf = new PdfReportHandler(new Mock<IReportGenerator>().Object, new Mock<IEmailService>().Object, new Mock<ILogger<PdfReportHandler>>().Object);
+        var pdf = new PdfReportHandler(
+            new Mock<IReportGenerator>().Object,
+            new Mock<IReportStore>().Object,
+            new Mock<IEmailOutbox>().Object,
+            new Mock<ILogger<PdfReportHandler>>().Object);
 
         ITaskHandlerRegistry registry = new TaskHandlerRegistry(new ITaskHandler[] { physical, anomaly, stats, pdf });
 

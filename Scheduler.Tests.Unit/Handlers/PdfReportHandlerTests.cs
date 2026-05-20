@@ -19,17 +19,25 @@ public class PdfReportHandlerTests
     public async Task ExecuteAsync_ReturnsPlaceholderResult()
     {
         var report = new Mock<IReportGenerator>();
-        var email = new Mock<IEmailService>();
+        var reportStore = new Mock<IReportStore>();
+        var outbox = new Mock<IEmailOutbox>();
         var logger = new Mock<ILogger<PdfReportHandler>>();
         report
             .Setup(r => r.GenerateAsync(It.IsAny<PdfReportRequestDto>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ReportDocumentDto("report.pdf", "application/pdf", System.Array.Empty<byte>()));
-        var handler = new PdfReportHandler(report.Object, email.Object, logger.Object);
+        var handler = new PdfReportHandler(report.Object, reportStore.Object, outbox.Object, logger.Object);
         var task = new JobContextDto(System.Guid.NewGuid(), TaskType.PdfReport, "plant", new TimeRangeDto());
         task.Variables.Add("temperature");
 
         var result = await handler.ExecuteAsync(task, CancellationToken.None);
 
         Assert.NotNull(result);
+        reportStore.Verify(
+            s => s.SaveAsync(
+                It.Is<Scheduler.Domain.ValueObjects.JobId>(id => id.Value == task.JobId),
+                It.IsAny<ReportDocumentDto>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        outbox.Verify(o => o.EnqueueAsync(It.IsAny<EmailDeliveryDto>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }
