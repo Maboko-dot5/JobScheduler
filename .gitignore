@@ -1,2 +1,4 @@
 **/bin/
 **/obj/
+report.pdf
+docs/*.log

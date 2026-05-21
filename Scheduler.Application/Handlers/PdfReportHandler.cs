@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Scheduler.Application.Dtos;
 using Scheduler.Application.Interfaces.Handlers;
+using Scheduler.Application.Interfaces.Repositories;
 using Scheduler.Application.Interfaces.Services;
+using Scheduler.Domain.Enums;
 using Scheduler.Domain.ValueObjects;
 
 namespace Scheduler.Application.Handlers;
@@ -13,9 +15,18 @@ namespace Scheduler.Application.Handlers;
 /// <summary>Handles PDF report generation tasks.</summary>
 public class PdfReportHandler : ITaskHandler
 {
+    private static readonly StatisticsWindow[] ReportWindows =
+    {
+        StatisticsWindow.Shift,
+        StatisticsWindow.Daily,
+        StatisticsWindow.Weekly
+    };
+
     private readonly IReportGenerator _reportGenerator;
     private readonly IReportStore _reportStore;
     private readonly IEmailOutbox _emailOutbox;
+    private readonly IStatisticsService _statisticsService;
+    private readonly ITimeSeriesRepository _timeSeriesRepository;
     private readonly ILogger<PdfReportHandler> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="PdfReportHandler"/> class.</summary>
@@ -23,11 +34,15 @@ public class PdfReportHandler : ITaskHandler
         IReportGenerator reportGenerator,
         IReportStore reportStore,
         IEmailOutbox emailOutbox,
+        IStatisticsService statisticsService,
+        ITimeSeriesRepository timeSeriesRepository,
         ILogger<PdfReportHandler> logger)
     {
         _reportGenerator = reportGenerator;
         _reportStore = reportStore;
         _emailOutbox = emailOutbox;
+        _statisticsService = statisticsService;
+        _timeSeriesRepository = timeSeriesRepository;
         _logger = logger;
     }
 
@@ -40,6 +55,31 @@ public class PdfReportHandler : ITaskHandler
             Variables = new List<string>(context.Variables),
             TimeRange = context.TimeRange
         };
+
+        var points = await _timeSeriesRepository.GetSeriesAsync(
+            context.PlantId,
+            context.Variables,
+            context.TimeRange.StartUtc,
+            context.TimeRange.EndUtc,
+            cancellationToken);
+
+        foreach (var window in ReportWindows)
+        {
+            var statisticsRequest = new StatisticsRequestDto($"{request.SeriesId}:{window}", window)
+            {
+                PlantId = context.PlantId,
+                Variables = new List<string>(context.Variables),
+                TimeRange = context.TimeRange,
+                Points = new List<TimeSeriesPointDto>(points)
+            };
+
+            var statistics = await _statisticsService.CalculateAsync(statisticsRequest, cancellationToken);
+            request.StatisticsSummaries.Add(new ReportStatisticsSummaryDto(window, statistics));
+            if (window == StatisticsWindow.Daily)
+            {
+                request.Statistics = statistics;
+            }
+        }
 
         var report = await _reportGenerator.GenerateAsync(request, cancellationToken);
         await _reportStore.SaveAsync(new JobId(context.JobId), report, cancellationToken);
@@ -56,7 +96,7 @@ public class PdfReportHandler : ITaskHandler
 
         return new TaskExecutionResultDto(true)
         {
-            Summary = $"Report generated: {report.FileName}, Email queued to {recipient}.",
+            Summary = $"Report generated: {report.FileName}, Shift/Daily/Weekly statistics included, Email queued to {recipient}.",
             OutputLocation = $"/api/jobs/{context.JobId}/report/download"
         };
     }

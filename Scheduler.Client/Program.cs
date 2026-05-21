@@ -1,8 +1,10 @@
 // PHASE 10: Scheduler.Client/Program.cs
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Scheduler.Application.Dtos;
@@ -193,9 +195,10 @@ public static class Program
                         Console.WriteLine("\nTask Results:");
                         try
                         {
-                            var formattedJson = JsonSerializer.Serialize(
-                                JsonSerializer.Deserialize<object>(status.Result.PayloadJson, jsonOptions),
-                                new JsonSerializerOptions { WriteIndented = true });
+                            var formattedJson = FormatPayloadJsonForDisplay(
+                                status.Result.PayloadJson,
+                                baseUrl,
+                                jsonOptions);
                             Console.WriteLine(formattedJson);
                         }
                         catch
@@ -233,5 +236,91 @@ public static class Program
         }
 
         return baseUrl + statusUrl;
+    }
+
+    private static string FormatPayloadJsonForDisplay(
+        string payloadJson,
+        string baseUrl,
+        JsonSerializerOptions jsonOptions)
+    {
+        var node = JsonNode.Parse(payloadJson);
+        if (node is null)
+        {
+            return payloadJson;
+        }
+
+        RewriteOutputLocations(node, baseUrl);
+
+        var displayOptions = new JsonSerializerOptions(jsonOptions)
+        {
+            WriteIndented = true
+        };
+        return node.ToJsonString(displayOptions);
+    }
+
+    private static void RewriteOutputLocations(JsonNode node, string baseUrl)
+    {
+        if (node is JsonObject jsonObject)
+        {
+            RewriteOutputLocationProperty(jsonObject, "OutputLocation", baseUrl);
+            RewriteOutputLocationProperty(jsonObject, "outputLocation", baseUrl);
+
+            var children = new List<JsonNode?>();
+            foreach (var property in jsonObject)
+            {
+                children.Add(property.Value);
+            }
+
+            foreach (var child in children)
+            {
+                if (child is not null)
+                {
+                    RewriteOutputLocations(child, baseUrl);
+                }
+            }
+
+            return;
+        }
+
+        if (node is JsonArray jsonArray)
+        {
+            foreach (var child in jsonArray)
+            {
+                if (child is not null)
+                {
+                    RewriteOutputLocations(child, baseUrl);
+                }
+            }
+        }
+    }
+
+    private static void RewriteOutputLocationProperty(JsonObject jsonObject, string propertyName, string baseUrl)
+    {
+        if (!jsonObject.TryGetPropertyValue(propertyName, out var outputNode) || outputNode is null)
+        {
+            return;
+        }
+
+        if (outputNode is not JsonValue outputValue ||
+            !outputValue.TryGetValue<string>(out var outputLocation) ||
+            string.IsNullOrWhiteSpace(outputLocation))
+        {
+            return;
+        }
+
+        jsonObject[propertyName] = BuildAbsoluteUrl(baseUrl, outputLocation);
+    }
+
+    private static string BuildAbsoluteUrl(string baseUrl, string pathOrUrl)
+    {
+        if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out _))
+        {
+            return pathOrUrl;
+        }
+
+        var normalizedPath = pathOrUrl.StartsWith("/", StringComparison.Ordinal)
+            ? pathOrUrl
+            : "/" + pathOrUrl;
+        return baseUrl.TrimEnd('/') + normalizedPath;
     }
 }

@@ -1,5 +1,6 @@
 // PHASE 7: Scheduler.Infrastructure/Services/FakeReportGenerator.cs
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +26,8 @@ public class FakeReportGenerator : IReportGenerator
             "Job Scheduler Report",
             $"Series: {request.SeriesId}",
             $"Plant: {request.PlantId}",
-            $"Variables: {(request.Variables.Count == 0 ? "<none>" : string.Join(", ", request.Variables))}"
+            $"Variables: {(request.Variables.Count == 0 ? "<none>" : string.Join(", ", request.Variables))}",
+            "Data Source: generated hard-coded sample values for submitted variables"
         };
 
         if (request.TimeRange is not null)
@@ -34,17 +36,66 @@ public class FakeReportGenerator : IReportGenerator
             lines.Add($"End: {request.TimeRange.EndUtc:O}");
         }
 
-        if (request.Statistics is not null)
+        if (request.StatisticsSummaries.Count > 0)
         {
-            lines.Add($"Statistics Series: {request.Statistics.SeriesId}");
-            lines.Add($"Statistics Metrics: {request.Statistics.Metrics.Count}");
-            foreach (var metric in request.Statistics.Metrics)
+            lines.Add("Statistics Summary");
+            foreach (var summary in request.StatisticsSummaries)
             {
-                lines.Add($"{metric.Key}: {metric.Value:0.###}");
+                AddStatisticsSummary(lines, summary, request.Variables);
             }
+        }
+        else if (request.Statistics is not null)
+        {
+            AddStatisticsSummary(
+                lines,
+                new ReportStatisticsSummaryDto(Scheduler.Domain.Enums.StatisticsWindow.Daily, request.Statistics),
+                request.Variables);
         }
 
         return lines;
+    }
+
+    private static void AddStatisticsSummary(
+        List<string> lines,
+        ReportStatisticsSummaryDto summary,
+        IReadOnlyList<string> variables)
+    {
+        lines.Add($"{summary.Window} Statistics");
+        lines.Add(
+            "Overall: " +
+            $"count={FormatMetric(summary.Statistics.Metrics, "count")}, " +
+            $"min={FormatMetric(summary.Statistics.Metrics, "min")}, " +
+            $"max={FormatMetric(summary.Statistics.Metrics, "max")}, " +
+            $"avg={FormatMetric(summary.Statistics.Metrics, "avg")}");
+        lines.Add(
+            "Availability: " +
+            $"uptime={FormatMetric(summary.Statistics.Metrics, "uptimePct")}%, " +
+            $"inTarget={FormatMetric(summary.Statistics.Metrics, "inTargetPct")}%, " +
+            $"windowHours={FormatMetric(summary.Statistics.Metrics, "windowHours")}, " +
+            $"windowCount={FormatMetric(summary.Statistics.Metrics, "windowCount")}");
+
+        foreach (var variable in variables)
+        {
+            var key = variable.ToLowerInvariant();
+            if (!summary.Statistics.Metrics.ContainsKey(key + ".count"))
+            {
+                continue;
+            }
+
+            lines.Add(
+                $"{variable}: " +
+                $"count={FormatMetric(summary.Statistics.Metrics, key + ".count")}, " +
+                $"min={FormatMetric(summary.Statistics.Metrics, key + ".min")}, " +
+                $"max={FormatMetric(summary.Statistics.Metrics, key + ".max")}, " +
+                $"avg={FormatMetric(summary.Statistics.Metrics, key + ".avg")}");
+        }
+    }
+
+    private static string FormatMetric(IReadOnlyDictionary<string, double> metrics, string key)
+    {
+        return metrics.TryGetValue(key, out var value)
+            ? value.ToString("0.###", CultureInfo.InvariantCulture)
+            : "n/a";
     }
 
     private static byte[] CreatePdf(IReadOnlyList<string> lines)

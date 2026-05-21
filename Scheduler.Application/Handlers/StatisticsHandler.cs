@@ -1,5 +1,7 @@
 // PHASE 5: Scheduler.Application/Handlers/StatisticsHandler.cs
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -51,7 +53,67 @@ public class StatisticsHandler : ITaskHandler
         var stats = await _statisticsService.CalculateAsync(request, cancellationToken);
         return new TaskExecutionResultDto(true)
         {
-            Summary = $"Statistics calculation completed. Metrics={stats.Metrics.Count}."
+            Summary = BuildSummary(window, stats, context.Variables)
         };
+    }
+
+    private static string BuildSummary(
+        StatisticsWindow window,
+        StatisticsResultDto statistics,
+        IReadOnlyList<string> variables)
+    {
+        var builder = new StringBuilder();
+        builder.Append(window);
+        builder.Append(" statistics: count=");
+        builder.Append(FormatMetric(statistics.Metrics, "count"));
+        builder.Append(", min=");
+        builder.Append(FormatMetric(statistics.Metrics, "min"));
+        builder.Append(", max=");
+        builder.Append(FormatMetric(statistics.Metrics, "max"));
+        builder.Append(", avg=");
+        builder.Append(FormatMetric(statistics.Metrics, "avg"));
+        builder.Append(", uptime=");
+        builder.Append(FormatMetric(statistics.Metrics, "uptimePct"));
+        builder.Append("%, in target=");
+        builder.Append(FormatMetric(statistics.Metrics, "inTargetPct"));
+        builder.Append('%');
+
+        if (statistics.Metrics.ContainsKey("windowCount") || statistics.Metrics.ContainsKey("windowHours"))
+        {
+            builder.Append(", windows=");
+            builder.Append(FormatMetric(statistics.Metrics, "windowCount"));
+            builder.Append(" x ");
+            builder.Append(FormatMetric(statistics.Metrics, "windowHours"));
+            builder.Append('h');
+        }
+
+        foreach (var variable in variables)
+        {
+            var key = variable.ToLowerInvariant();
+            if (!statistics.Metrics.ContainsKey(key + ".count"))
+            {
+                continue;
+            }
+
+            builder.Append(". ");
+            builder.Append(variable);
+            builder.Append(": count=");
+            builder.Append(FormatMetric(statistics.Metrics, key + ".count"));
+            builder.Append(", min=");
+            builder.Append(FormatMetric(statistics.Metrics, key + ".min"));
+            builder.Append(", max=");
+            builder.Append(FormatMetric(statistics.Metrics, key + ".max"));
+            builder.Append(", avg=");
+            builder.Append(FormatMetric(statistics.Metrics, key + ".avg"));
+        }
+
+        return builder.ToString();
+    }
+
+    private static string FormatMetric(IReadOnlyDictionary<string, double> metrics, string key)
+    {
+        return metrics.TryGetValue(key, out var value)
+            ? value.ToString("0.###", CultureInfo.InvariantCulture)
+            : "n/a";
     }
 }

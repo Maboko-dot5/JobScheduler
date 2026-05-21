@@ -21,12 +21,16 @@ public class PdfReportRequestDto
     /// <summary>Statistics summary to include.</summary>
     public StatisticsResultDto? Statistics { get; set; }
 
+    /// <summary>Statistics summaries to include, grouped by reporting window.</summary>
+    public List<ReportStatisticsSummaryDto> StatisticsSummaries { get; set; }
+
     /// <summary>Initializes a new instance of the <see cref="PdfReportRequestDto"/> class.</summary>
     public PdfReportRequestDto()
     {
         SeriesId = string.Empty;
         PlantId = string.Empty;
         Variables = new List<string>();
+        StatisticsSummaries = new List<ReportStatisticsSummaryDto>();
     }
 
     /// <summary>Initializes a new instance of the <see cref="PdfReportRequestDto"/> class with required fields.</summary>
@@ -35,5 +39,6 @@ public class PdfReportRequestDto
         SeriesId = seriesId;
         PlantId = string.Empty;
         Variables = new List<string>();
+        StatisticsSummaries = new List<ReportStatisticsSummaryDto>();
     }
 }

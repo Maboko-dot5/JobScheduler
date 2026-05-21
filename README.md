@@ -25,26 +25,26 @@ dotnet --version
 
 ## Restore
 
-```powershell
-dotnet restore .\JobScheduler.sln
+```bash
+dotnet restore JobScheduler.sln
 ```
 
 ## Build
 
-```powershell
-dotnet build .\JobScheduler.sln
+```bash
+dotnet build JobScheduler.sln
 ```
 
 For a release build:
 
-```powershell
-dotnet build .\JobScheduler.sln --configuration Release
+```bash
+dotnet build JobScheduler.sln --configuration Release
 ```
 
 ## Test
 
-```powershell
-dotnet test .\JobScheduler.sln
+```bash
+dotnet test JobScheduler.sln
 ```
 
 The solution includes unit and integration tests. CI is configured in `.github/workflows/dotnet-ci.yml` to restore, build, test, and publish the API/client on pushes and pull requests to `main`.
@@ -53,9 +53,17 @@ The solution includes unit and integration tests. CI is configured in `.github/w
 
 From the repository root:
 
+PowerShell:
+
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = "Development"
-dotnet run --project .\Scheduler.Api\Scheduler.Api.csproj --urls "http://localhost:5000"
+dotnet run --project Scheduler.Api --urls "http://localhost:5000"
+```
+
+Git Bash:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project Scheduler.Api --urls "http://localhost:5000"
 ```
 
 The API will be available at:
@@ -76,11 +84,52 @@ Useful endpoints:
 
 Start the API first, then open a second terminal:
 
-```powershell
-dotnet run --project .\Scheduler.Client\Scheduler.Client.csproj -- "http://localhost:5000"
+```bash
+dotnet run --project Scheduler.Client -- "http://localhost:5000"
 ```
 
+Use the project folder name as shown above. This works from Git Bash and PowerShell when run from the repository root.
+
 The client presents an interactive menu for submitting statistics, physical filter, anomaly filter, and PDF report jobs.
+
+### Answering The Client Menu
+
+When the client asks for variables, do not type quote characters. Type comma-separated variable names directly:
+
+```text
+temperature,pressure
+```
+
+Do not type:
+
+```text
+'temperature,pressure'
+```
+
+The quotes would become part of the variable names and the output would show names such as `'temperature` and `pressure'`.
+
+Example statistics job:
+
+```text
+Choose option (1-5): 1
+Enter job name (default: 'Test Job'): TJ1
+Enter plant ID (default: 'PlantA'): Plant-001
+Enter variables (comma-separated, default: 'temperature,pressure'): temperature,pressure
+Enter days back (default: 1): 2
+Enter statistics window (0=Shift, 1=Daily, 2=Weekly, default: 1): 2
+```
+
+Example PDF report job:
+
+```text
+Choose option (1-5): 4
+Enter job name (default: 'Test Job'): TJ1
+Enter plant ID (default: 'PlantA'): Plant-001
+Enter variables (comma-separated, default: 'temperature,pressure'): temperature,pressure
+Enter days back (default: 1): 3
+```
+
+For PDF report jobs, the task result includes a full download URL such as `http://localhost:5000/api/jobs/{jobId}/report/download`, which can be Ctrl+clicked from most terminals.
 
 ## Submit A Job Manually
 
