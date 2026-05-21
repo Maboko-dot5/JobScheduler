@@ -12,6 +12,13 @@ JobScheduler is a .NET job scheduling prototype for processing historical IoT ti
 - `Scheduler.Tests.Unit` - Unit tests.
 - `Scheduler.Tests.Integration` - API integration tests.
 
+## Documentation
+
+The system design documentation for the Mintek submission is stored in the `docs/` folder:
+
+- [Mintek_Question_1_System_Design_and Q2 Documentation.docx](<docs/Mintek_Question_1_System_Design_and Q2 Documentation.docx>) - final Word document containing the Question 1 answer and Question 2 system design notes.
+- [job-scheduler-architecture.png](docs/job-scheduler-architecture.png) - architecture diagram used by the design document.
+
 ## Prerequisites
 
 - .NET SDK that supports `net10.0`
@@ -182,4 +189,29 @@ Invoke-WebRequest "http://localhost:5000/api/jobs/$jobId/report/download" -OutFi
 
 ## AI Declaration
 
-AI coding assistance was used during development of this submission. The design, implementation, testing, and documentation were reviewed and adapted by the author.
+I used an AI coding assistant during this project: GitHub Copilot Chat, model GPT-5.3-Codex.
+
+Scope of use:
+
+- Code scaffolding and refactoring suggestions.
+- Test case drafting and review.
+- Documentation wording and summary generation.
+- Debugging guidance.
+
+Human responsibility:
+
+- I reviewed all AI-generated content before accepting it.
+- I modified outputs where needed for correctness and project fit.
+- I ran builds/tests and validated behavior manually.
+- I take full responsibility for the final submitted work.
+
+Verification performed:
+
+- Unit and integration tests executed.
+- API and client flows manually tested.
+- Output/content checks completed, including PDF validity and endpoint behavior.
+
+Limitations and notes:
+
+- AI suggestions may contain mistakes; only validated code was kept.
+- Sensitive data was not intentionally shared with AI.
